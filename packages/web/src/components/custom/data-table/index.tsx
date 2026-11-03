@@ -55,6 +55,35 @@ export type RowDataWithActions<TData extends DataWithId> = TData & {
 
 export const CURSOR_QUERY_PARAM = 'cursor';
 export const LIMIT_QUERY_PARAM = 'limit';
+export const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 30, 50];
+
+/**
+ * URL param names a table uses for its page. Pass the same `paginationKey`
+ * to the table and to the hook that reads the page, so two paged tables on
+ * one page don't share a cursor.
+ */
+export function getPaginationQueryParams(paginationKey?: string) {
+  if (isNil(paginationKey)) {
+    return { cursor: CURSOR_QUERY_PARAM, limit: LIMIT_QUERY_PARAM };
+  }
+  return {
+    cursor: `${paginationKey}Cursor`,
+    limit: `${paginationKey}Limit`,
+  };
+}
+
+export function readPaginationFromSearchParams(
+  searchParams: URLSearchParams,
+  paginationKey?: string,
+): { cursor: string | undefined; limit: number } {
+  const names = getPaginationQueryParams(paginationKey);
+  const limit = parseInt(searchParams.get(names.limit) ?? '', 10);
+  return {
+    cursor: searchParams.get(names.cursor) || undefined,
+    limit: Number.isNaN(limit) ? DEFAULT_PAGE_SIZE : limit,
+  };
+}
 
 type DataTableAction<TData extends DataWithId> = (
   row: RowDataWithActions<TData>,
@@ -102,6 +131,8 @@ interface DataTableProps<
   bordered?: boolean;
   frameClassName?: string;
   toolbarClassName?: string;
+  /** Prefix for this table's cursor/limit URL params. See getPaginationQueryParams. */
+  paginationKey?: string;
 }
 
 export type DataTableFilters<Keys extends string> = DataTableFilterProps & {
@@ -149,6 +180,7 @@ export function DataTable<
   getRowClassName,
   isRowSelectionDisabled,
   virtualizeRows = false,
+  paginationKey,
 }: DataTableProps<TData, TValue, Keys>) {
   const selectColumnDef: ColumnDef<RowDataWithActions<TData>, TValue> = {
     id: 'select',
@@ -216,8 +248,11 @@ export function DataTable<
   }, {} as Record<string, boolean>);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const startingCursor = searchParams.get('cursor') || undefined;
-  const startingLimit = searchParams.get('limit') || '10';
+  const paginationParams = getPaginationQueryParams(paginationKey);
+  const startingCursor =
+    searchParams.get(paginationParams.cursor) || undefined;
+  const startingLimit =
+    searchParams.get(paginationParams.limit) || `${DEFAULT_PAGE_SIZE}`;
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(
     startingCursor,
   );
@@ -318,13 +353,13 @@ export function DataTable<
         const newParams = new URLSearchParams(prev);
 
         if (!isNil(currentCursor) && currentCursor !== '') {
-          newParams.set('cursor', currentCursor);
+          newParams.set(paginationParams.cursor, currentCursor);
         } else {
-          newParams.delete('cursor');
+          newParams.delete(paginationParams.cursor);
         }
         const pageSize = table.getState().pagination.pageSize;
         if (pageSize) {
-          newParams.set('limit', `${pageSize}`);
+          newParams.set(paginationParams.limit, `${pageSize}`);
         }
         return newParams;
       },
@@ -374,6 +409,7 @@ export function DataTable<
                   <DataTableFilter
                     key={filter.accessorKey}
                     column={table.getColumn(filter.accessorKey)}
+                    cursorQueryParam={paginationParams.cursor}
                     {...filter}
                   />
                 ))}
@@ -696,7 +732,7 @@ export function DataTable<
                 />
               </SelectTrigger>
               <SelectContent side="top">
-                {[10, 30, 50].map((pageSize) => (
+                {PAGE_SIZE_OPTIONS.map((pageSize) => (
                   <SelectItem key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>

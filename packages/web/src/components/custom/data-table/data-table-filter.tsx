@@ -48,10 +48,12 @@ export function DataTableFilter<TData, TValue>({
   title,
   column,
   accessorKey,
+  cursorQueryParam = CURSOR_QUERY_PARAM,
   ...props
 }: DataTableFilterProps & {
   column?: Column<TData, TValue>;
   accessorKey?: string;
+  cursorQueryParam?: string;
 }) {
   const facets = column?.getFacetedUniqueValues();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,7 +67,7 @@ export function DataTableFilter<TData, TValue>({
           newParams.delete(paramKey as string);
           newParams.delete(`${paramKey}After`);
           newParams.delete(`${paramKey}Before`);
-          newParams.delete(CURSOR_QUERY_PARAM);
+          newParams.delete(cursorQueryParam);
           if (!filterValue) {
             return newParams;
           }
@@ -108,7 +110,7 @@ export function DataTableFilter<TData, TValue>({
         column?.setFilterValue(filterValue ? filterValue : undefined);
       }
     },
-    [paramKey, column, setSearchParams],
+    [paramKey, column, setSearchParams, cursorQueryParam],
   );
 
   switch (props.type) {
@@ -158,7 +160,7 @@ export function DataTableFilter<TData, TValue>({
           (prev) => {
             const newParams = new URLSearchParams(prev);
             newParams.delete(key);
-            newParams.delete(CURSOR_QUERY_PARAM);
+            newParams.delete(cursorQueryParam);
             if (checked) {
               newParams.append(key, 'true');
             }
