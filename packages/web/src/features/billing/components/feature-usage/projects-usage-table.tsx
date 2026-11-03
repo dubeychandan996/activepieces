@@ -69,6 +69,7 @@ export function ProjectsUsageTable({
         />
       </div>
       <DataTable
+        hideFooterWhenSinglePage
         bordered={frameClassName !== undefined}
         frameClassName={frameClassName}
         columns={COLUMNS}

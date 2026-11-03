@@ -87,6 +87,7 @@ export function InternalErrorsTable({
         </div>
       ) : (
         <DataTable
+          hideFooterWhenSinglePage
           columns={columns}
           page={{ data: errors, next: null, previous: null }}
           isLoading={false}

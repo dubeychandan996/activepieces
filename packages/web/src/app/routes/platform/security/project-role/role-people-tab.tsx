@@ -23,6 +23,7 @@ export function RolePeopleTab({ projectRole }: RolePeopleTabProps) {
     <ScrollArea className="h-full">
       <div className="px-6 pt-4 pb-4">
         <DataTable
+          hideFooterWhenSinglePage
           columns={peopleColumns}
           page={data}
           isLoading={isLoading}

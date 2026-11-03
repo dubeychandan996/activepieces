@@ -71,6 +71,7 @@ export function StuckJobsTable({ stuckJobs, isLoading }: StuckJobsTableProps) {
         </div>
       ) : (
         <DataTable
+          hideFooterWhenSinglePage
           columns={columns}
           page={{ data: jobs, next: null, previous: null }}
           isLoading={false}

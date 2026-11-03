@@ -102,16 +102,12 @@ export const projectCollectionUtils = {
     onSuccess: (project: ProjectWithLimits) => void,
     onError: (error: Error) => void,
   ) => {
-    const queryClient = useQueryClient();
     return useMutation({
       mutationFn: (request: CreatePlatformProjectRequest) =>
         api.post<ProjectWithLimits>('/v1/projects', request),
       onSuccess: async (data) => {
         await projectCollection.preload();
         projectCollection.utils.writeInsert(data);
-        await queryClient.invalidateQueries({
-          queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY],
-        });
         onSuccess(data);
       },
       onError: (error) => {
@@ -123,7 +119,6 @@ export const projectCollectionUtils = {
     onSuccess: () => void,
     onError: (error: Error) => void,
   ) => {
-    const queryClient = useQueryClient();
     return useMutation({
       mutationFn: ({
         projectId,
@@ -135,9 +130,6 @@ export const projectCollectionUtils = {
       onSuccess: async (data) => {
         await projectCollection.preload();
         projectCollection.utils.writeUpdate(data);
-        await queryClient.invalidateQueries({
-          queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY],
-        });
         onSuccess();
       },
       onError,

@@ -133,6 +133,8 @@ interface DataTableProps<
   toolbarClassName?: string;
   /** Prefix for this table's cursor/limit URL params. See getPaginationQueryParams. */
   paginationKey?: string;
+  /** Hide the footer while the whole list fits on one page at the smallest page size. */
+  hideFooterWhenSinglePage?: boolean;
 }
 
 export type DataTableFilters<Keys extends string> = DataTableFilterProps & {
@@ -181,6 +183,7 @@ export function DataTable<
   isRowSelectionDisabled,
   virtualizeRows = false,
   paginationKey,
+  hideFooterWhenSinglePage = false,
 }: DataTableProps<TData, TValue, Keys>) {
   const selectColumnDef: ColumnDef<RowDataWithActions<TData>, TValue> = {
     id: 'select',
@@ -385,6 +388,7 @@ export function DataTable<
     ? table.getPrePaginationRowModel().rows.length
     : tableData.length;
   const fitsOnOnePage =
+    hideFooterWhenSinglePage &&
     totalRows <= PAGE_SIZE_OPTIONS[0] &&
     (clientPagination
       ? table.getPageCount() <= 1

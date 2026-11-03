@@ -19,6 +19,7 @@ export function AdminDataTable<
   return (
     <div data-slot="admin-data-table" className="shrink-0">
       <DataTable
+        hideFooterWhenSinglePage
         {...props}
         emptyStateIcon={
           props.emptyStateIcon && (

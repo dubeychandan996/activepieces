@@ -257,6 +257,7 @@ function UsageListBody({
         </p>
       )}
       <DataTable
+        hideFooterWhenSinglePage
         columns={columns}
         page={{ data: matches, next: null, previous: null }}
         isLoading={false}

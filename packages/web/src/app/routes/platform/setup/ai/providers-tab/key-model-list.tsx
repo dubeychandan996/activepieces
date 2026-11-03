@@ -266,6 +266,7 @@ export function KeyModelList({
 
       <div className="border-t border-gray-6/60 [&_tbody_tr:last-child]:border-b-0 [&_thead]:border-t-0">
         <DataTable
+          hideFooterWhenSinglePage
           columns={columns}
           page={{ data: filtered, next: null, previous: null }}
           isLoading={isLoading}

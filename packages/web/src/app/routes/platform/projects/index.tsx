@@ -370,7 +370,15 @@ export default function ProjectsPage() {
         description={t('Manage your automation projects')}
         resources={adminPageResources.projects}
       >
-        <CreateProjectButton variant="full" projects={teamProjects} />
+        <CreateProjectButton
+          variant="full"
+          projects={teamProjects}
+          onCreate={() => {
+            projectHooks
+              .invalidatePlatformProjectsPage(queryClient)
+              .catch(() => undefined);
+          }}
+        />
       </AdminPageHeader>
       <AdminDataTable
         emptyStateTextTitle={t('No projects found')}
@@ -417,6 +425,9 @@ export default function ProjectsPage() {
         open={editDialogOpen}
         onClose={() => {
           setEditDialogOpen(false);
+          projectHooks
+            .invalidatePlatformProjectsPage(queryClient)
+            .catch(() => undefined);
         }}
         initialValues={
           editDialogProject && {
