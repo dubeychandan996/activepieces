@@ -364,7 +364,13 @@ export function DataTable<
       },
       { replace: true },
     );
-  }, [currentCursor, table.getState().pagination.pageSize, hidePagination]);
+  }, [
+    currentCursor,
+    table.getState().pagination.pageSize,
+    hidePagination,
+    paginationParams.cursor,
+    paginationParams.limit,
+  ]);
 
   useEffect(() => {
     setTableData(
@@ -373,6 +379,17 @@ export function DataTable<
       ),
     );
   }, [deletedRows]);
+
+  // A list that fits on one page at the smallest page size doesn't need a footer.
+  const totalRows = clientPagination
+    ? table.getPrePaginationRowModel().rows.length
+    : tableData.length;
+  const fitsOnOnePage =
+    totalRows <= PAGE_SIZE_OPTIONS[0] &&
+    (clientPagination
+      ? table.getPageCount() <= 1
+      : !nextPageCursor && !previousPageCursor);
+  const showPagination = !hidePagination && !virtualizeRows && !fitsOnOnePage;
 
   const resetSelection = () => {
     table.toggleAllRowsSelected(false);
@@ -710,7 +727,7 @@ export function DataTable<
           </TableBody>
         </Table>
       </div>
-      {!hidePagination && !virtualizeRows && (
+      {showPagination && (
         <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 px-2 py-4 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-gray-11 whitespace-nowrap">
