@@ -99,7 +99,7 @@ const PieceSetDetailsPage = () => {
 
         <TabsContent
           value="pieces"
-          className="mt-0 flex min-h-0 flex-1 flex-col gap-6 data-[state=inactive]:hidden"
+          className="mt-0 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto data-[state=inactive]:hidden"
         >
           <SettingsPanel flush className="shrink-0">
             <SettingsRow title={t('Assigned projects')}>

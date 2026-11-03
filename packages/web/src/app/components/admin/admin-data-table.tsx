@@ -17,10 +17,7 @@ export function AdminDataTable<
   >,
 ) {
   return (
-    <div
-      data-slot="admin-data-table"
-      className="flex max-h-full min-h-0 flex-initial flex-col"
-    >
+    <div data-slot="admin-data-table" className="shrink-0">
       <DataTable
         {...props}
         emptyStateIcon={

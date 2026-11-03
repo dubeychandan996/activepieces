@@ -1,4 +1,4 @@
-import { Metadata, Nullable, OptionalArrayFromQuery, SAFE_STRING_PATTERN } from '@activepieces/core-utils'
+import { Metadata, Nullable, OptionalArrayFromQuery, OptionalBooleanFromQuery, SAFE_STRING_PATTERN } from '@activepieces/core-utils'
 import { z } from 'zod'
 import { PiecesFilterType, ProjectIcon, ProjectType } from './project'
 
@@ -42,6 +42,7 @@ export const ListProjectRequestForPlatformQueryParams = z.object({
     cursor: z.string().optional(),
     displayName: z.string().optional(),
     types: OptionalArrayFromQuery(z.nativeEnum(ProjectType)),
+    includeGlobalConnectionsCount: OptionalBooleanFromQuery,
 })
 
 export type ListProjectRequestForPlatformQueryParams = z.infer<typeof ListProjectRequestForPlatformQueryParams>

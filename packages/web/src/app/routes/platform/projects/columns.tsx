@@ -1,7 +1,7 @@
 import { isNil } from '@activepieces/core-utils';
 import {
+  PlatformProjectListItem,
   PlatformResponse,
-  ProjectWithLimits,
   ProjectType,
 } from '@activepieces/shared';
 import { ColumnDef } from '@tanstack/react-table';
@@ -30,11 +30,9 @@ import {
 export const projectsTableColumns = ({
   platform,
 }: ProjectsTableColumnsProps): ColumnDef<
-  RowDataWithActions<ProjectWithLimits & { globalConnectionsCount: number }>
+  RowDataWithActions<PlatformProjectListItem>
 >[] => {
-  const columns: ColumnDef<
-    RowDataWithActions<ProjectWithLimits & { globalConnectionsCount: number }>
-  >[] = [
+  const columns: ColumnDef<RowDataWithActions<PlatformProjectListItem>>[] = [
     {
       accessorKey: 'displayName',
       size: 220,
@@ -150,7 +148,7 @@ export const projectsTableColumns = ({
       cell: ({ row }) => {
         return (
           <div className="text-left tabular-nums">
-            {row.original.globalConnectionsCount}
+            {row.original.globalConnectionsCount ?? 0}
           </div>
         );
       },

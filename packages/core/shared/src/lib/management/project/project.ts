@@ -82,6 +82,12 @@ export const ProjectWithLimits = Project.omit({ deleted: true }).extend({
 
 export type ProjectWithLimits = z.infer<typeof ProjectWithLimits>
 
+export const PlatformProjectListItem = ProjectWithLimits.extend({
+    globalConnectionsCount: z.number().optional(),
+})
+
+export type PlatformProjectListItem = z.infer<typeof PlatformProjectListItem>
+
 export const ProjectMetaData = z.object({
     id: z.string(),
     displayName: z.string(),

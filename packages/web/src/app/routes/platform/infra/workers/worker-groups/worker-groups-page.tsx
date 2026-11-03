@@ -14,6 +14,7 @@ import {
   adminPageResources,
 } from '@/app/components/admin';
 import { DataFetchErrorState } from '@/components/custom/data-fetch-error-state';
+import { getPaginationQueryParams } from '@/components/custom/data-table';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,15 +29,16 @@ import { cn } from '@/lib/utils';
 import { AddItemsDialog } from './add-items-dialog';
 import { GroupCards } from './group-cards';
 import { GroupPage } from './group-page';
-import {
-  PROJECT_FLOWS_PAGE_SIZE,
-  groupUtils,
-  workerGroupsQueries,
-} from './hooks';
+import { groupUtils, workerGroupsQueries } from './hooks';
 import { SearchBox, modelSentence } from './parts';
 import { SearchResults } from './search-results';
 import { NoGroupsGuide } from './setup-guide';
-import { FlowsTable } from './tables';
+import {
+  FlowsTable,
+  PROJECT_FLOWS_PAGINATION_KEY,
+  WORKER_GROUP_FLOWS_PAGINATION_KEY,
+  WORKER_GROUP_PROJECTS_PAGINATION_KEY,
+} from './tables';
 
 export function WorkerGroupsPage() {
   const overviewQuery = workerGroupsQueries.useOverview();
@@ -49,7 +51,6 @@ export function WorkerGroupsPage() {
   const query = params.get('q') ?? '';
   const groupParam = params.get('group');
   const name = params.get('name') ?? '';
-  const cursor = params.get('cursor') ?? undefined;
   const [flowsOf, setFlowsOf] = useState<WorkerGroupProjectAssignment | null>(
     null,
   );
@@ -57,7 +58,7 @@ export function WorkerGroupsPage() {
   const searching = query.trim().length > 0;
   const noGroups = overview !== undefined && overview.groups.length === 0;
 
-  const update = (next: Partial<Record<UrlKey, string | null>>) => {
+  const update = (next: Record<string, string | null>) => {
     setParams(
       (prev) => {
         const merged = new URLSearchParams(prev);
@@ -74,7 +75,9 @@ export function WorkerGroupsPage() {
   const cards = (
     <GroupCards
       overview={overview}
-      onOpen={(key) => update({ group: key, name: null, cursor: null })}
+      onOpen={(key) =>
+        update({ group: key, name: null, ...RESET_GROUP_CURSORS })
+      }
       onAdd={setAddingTo}
     />
   );
@@ -108,11 +111,16 @@ export function WorkerGroupsPage() {
               overview={overview}
               groupKey={groupParam}
               search={name}
-              onSearchChange={(value) => update({ name: value, cursor: null })}
-              cursor={cursor}
-              onCursorChange={(next) => update({ cursor: next ?? null })}
-              onBack={() => update({ group: null, name: null, cursor: null })}
-              onOpenFlows={setFlowsOf}
+              onSearchChange={(value) =>
+                update({ name: value, [PROJECTS_CURSOR]: null })
+              }
+              onBack={() =>
+                update({ group: null, name: null, ...RESET_GROUP_CURSORS })
+              }
+              onOpenFlows={(project) => {
+                update({ [PROJECT_FLOWS_CURSOR]: null });
+                setFlowsOf(project);
+              }}
               showRunLimit={showRunLimit}
             />
           ) : (
@@ -151,10 +159,7 @@ export function WorkerGroupsPage() {
               <FlowsTable
                 overview={overview}
                 projectId={flowsOf.id}
-                expectedRows={Math.min(
-                  flowsOf.flowCount,
-                  PROJECT_FLOWS_PAGE_SIZE,
-                )}
+                paginationKey={PROJECT_FLOWS_PAGINATION_KEY}
                 emptyText={t('This project has no flows.')}
                 scrollBody
                 footerAction={
@@ -178,4 +183,13 @@ export function WorkerGroupsPage() {
   );
 }
 
-type UrlKey = 'q' | 'group' | 'name' | 'cursor';
+const PROJECTS_CURSOR = getPaginationQueryParams(
+  WORKER_GROUP_PROJECTS_PAGINATION_KEY,
+).cursor;
+const PROJECT_FLOWS_CURSOR = getPaginationQueryParams(
+  PROJECT_FLOWS_PAGINATION_KEY,
+).cursor;
+const RESET_GROUP_CURSORS = {
+  [PROJECTS_CURSOR]: null,
+  [getPaginationQueryParams(WORKER_GROUP_FLOWS_PAGINATION_KEY).cursor]: null,
+};

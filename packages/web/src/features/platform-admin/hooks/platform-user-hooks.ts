@@ -3,21 +3,30 @@ import {
   InvitationType,
   UpdateUserRequestBody,
   User,
+  UserInvitation,
   UserStatus,
   UserWithMetaInformation,
 } from '@activepieces/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { t } from 'i18next';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { platformUserApi } from '@/api/platform-user-api';
+import { readPaginationFromSearchParams } from '@/components/custom/data-table';
 import { userInvitationApi } from '@/features/members/api/user-invitation';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { userHooks } from '@/hooks/user-hooks';
 
+export const INVITATIONS_PAGINATION_KEY = 'invitations';
+
 export const platformUserKeys = {
   users: ['users'] as const,
   invitations: ['platform-invitations'] as const,
+  usersPage: (cursor: string | undefined, limit: number) =>
+    [...platformUserKeys.users, 'page', cursor, limit] as const,
+  invitationsPage: (cursor: string | undefined, limit: number) =>
+    [...platformUserKeys.invitations, 'page', cursor, limit] as const,
 };
 
 export const platformUserHooks = {
@@ -36,6 +45,32 @@ export const platformUserHooks = {
         return results;
       },
       enabled: canListUsers,
+    });
+  },
+  useUsersPage: () => {
+    const [searchParams] = useSearchParams();
+    const { cursor, limit } = readPaginationFromSearchParams(searchParams);
+    return useQuery<SeekPage<UserWithMetaInformation>, Error>({
+      queryKey: platformUserKeys.usersPage(cursor, limit),
+      queryFn: () => platformUserApi.list({ cursor, limit }),
+    });
+  },
+  useInvitationsPage: () => {
+    const [searchParams] = useSearchParams();
+    const { cursor, limit } = readPaginationFromSearchParams(
+      searchParams,
+      INVITATIONS_PAGINATION_KEY,
+    );
+    return useQuery<SeekPage<UserInvitation>, Error>({
+      queryKey: platformUserKeys.invitationsPage(cursor, limit),
+      queryFn: () =>
+        userInvitationApi.list({
+          type: InvitationType.PLATFORM,
+          projectId: null,
+          cursor,
+          limit,
+        }),
+      staleTime: 0,
     });
   },
   usePlatformInvitations: ({ enabled = true }: { enabled?: boolean } = {}) => {

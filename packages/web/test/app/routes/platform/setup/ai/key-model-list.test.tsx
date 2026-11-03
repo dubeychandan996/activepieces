@@ -9,6 +9,7 @@ import {
 } from '@activepieces/shared';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { KeyModelList } from '@/app/routes/platform/setup/ai/providers-tab/key-model-list';
@@ -16,21 +17,6 @@ import { KeyModelList } from '@/app/routes/platform/setup/ai/providers-tab/key-m
 vi.mock('i18next', () => ({
   t: (key: string, vars?: Record<string, unknown>) =>
     key.replace(/\{(\w+)\}/g, (_, name) => String(vars?.[name] ?? name)),
-}));
-
-vi.mock('@/app/routes/platform/setup/ai/components/model-detail-row', () => ({
-  ModelDetailRow: ({
-    name,
-    nameSuffix,
-  }: {
-    name: string;
-    nameSuffix: React.ReactNode;
-  }) => (
-    <span>
-      {name}
-      {nameSuffix}
-    </span>
-  ),
 }));
 
 vi.mock('@/components/ui/select', () => ({
@@ -70,17 +56,19 @@ const renderList = (
 ) => {
   const onChange = vi.fn();
   render(
-    <KeyModelList
-      config={CONFIG}
-      models={MODELS}
-      staleIds={[]}
-      tiersByModel={new Map([['gpt-main', ['Smart']]])}
-      allModels={false}
-      selectedIds={['gpt-main']}
-      isLoading={false}
-      onChange={onChange}
-      {...props}
-    />,
+    <MemoryRouter>
+      <KeyModelList
+        config={CONFIG}
+        models={MODELS}
+        staleIds={[]}
+        tiersByModel={new Map([['gpt-main', ['Smart']]])}
+        allModels={false}
+        selectedIds={['gpt-main']}
+        isLoading={false}
+        onChange={onChange}
+        {...props}
+      />
+    </MemoryRouter>,
   );
   return { onChange };
 };

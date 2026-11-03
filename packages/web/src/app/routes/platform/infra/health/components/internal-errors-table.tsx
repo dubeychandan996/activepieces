@@ -1,19 +1,15 @@
 import { InternalErrorImpactItem } from '@activepieces/shared';
+import { ColumnDef } from '@tanstack/react-table';
 import { t } from 'i18next';
 import { CircleCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { SettingsPanel } from '@/app/components/admin';
+import { DataTable, RowDataWithActions } from '@/components/custom/data-table';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatUtils } from '@/lib/format-utils';
+
+type InternalErrorRow = InternalErrorImpactItem & { id: string };
 
 type InternalErrorsTableProps = {
   internalErrors: InternalErrorImpactItem[] | undefined;
@@ -25,8 +21,48 @@ export function InternalErrorsTable({
   isLoading,
 }: InternalErrorsTableProps) {
   const navigate = useNavigate();
-  const errors = internalErrors ?? [];
+  const errors: InternalErrorRow[] = (internalErrors ?? []).map((error) => ({
+    ...error,
+    id: `${error.projectId}-${error.flowId}`,
+  }));
   const total = errors.reduce((sum, error) => sum + error.count, 0);
+
+  const columns: ColumnDef<RowDataWithActions<InternalErrorRow>>[] = [
+    {
+      accessorKey: 'projectName',
+      header: () => t('Project'),
+      cell: ({ row }) => (
+        <span className="text-gray-11">{row.original.projectName}</span>
+      ),
+    },
+    {
+      accessorKey: 'flowName',
+      header: () => t('Flow'),
+      cell: ({ row }) => (
+        <span className="font-medium">{row.original.flowName}</span>
+      ),
+    },
+    {
+      accessorKey: 'count',
+      header: () => <div className="text-right">{t('Errors')}</div>,
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">
+          {formatUtils.formatNumber(row.original.count)}
+        </div>
+      ),
+    },
+    {
+      id: 'share',
+      header: () => <div className="text-right">{t('Share')}</div>,
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums text-gray-11">
+          {total === 0
+            ? '—'
+            : `${Math.round((row.original.count / total) * 100)}%`}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <SettingsPanel
@@ -50,42 +86,22 @@ export function InternalErrorsTable({
           <p className="text-sm">{t('No internal errors in this period')}</p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Project')}</TableHead>
-              <TableHead>{t('Flow')}</TableHead>
-              <TableHead className="text-right">{t('Errors')}</TableHead>
-              <TableHead className="text-right">{t('Share')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {errors.map((error) => (
-              <TableRow
-                key={`${error.projectId}-${error.flowId}`}
-                className="cursor-pointer"
-                onClick={() =>
-                  navigate(
-                    `/projects/${error.projectId}/runs?flowId=${error.flowId}`,
-                  )
-                }
-              >
-                <TableCell className="text-gray-11">
-                  {error.projectName}
-                </TableCell>
-                <TableCell className="font-medium">{error.flowName}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatUtils.formatNumber(error.count)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums text-gray-11">
-                  {total === 0
-                    ? '—'
-                    : `${Math.round((error.count / total) * 100)}%`}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={columns}
+          page={{ data: errors, next: null, previous: null }}
+          isLoading={false}
+          isError={false}
+          errorStateEntity={t('internal errors')}
+          emptyStateTextTitle={t('No internal errors in this period')}
+          emptyStateTextDescription=""
+          emptyStateIcon={<CircleCheck />}
+          getRowId={(error) => error.id}
+          onRowClick={(error) =>
+            navigate(`/projects/${error.projectId}/runs?flowId=${error.flowId}`)
+          }
+          clientPagination={true}
+          paginationKey="internalErrors"
+        />
       )}
     </SettingsPanel>
   );

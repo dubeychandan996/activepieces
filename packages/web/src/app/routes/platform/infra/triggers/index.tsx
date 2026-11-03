@@ -248,7 +248,7 @@ export default function TriggerHealthPage() {
           'Trigger health information will appear here',
         )}
         emptyStateIcon={<CheckCircle />}
-        hidePagination={true}
+        clientPagination={true}
         columns={columns}
         page={{ data: triggerHealthData, previous: '', next: '' }}
         isLoading={isLoading}

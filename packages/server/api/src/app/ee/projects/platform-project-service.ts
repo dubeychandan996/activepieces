@@ -1,6 +1,6 @@
 import { ActivepiecesError, apId, Cursor, ErrorCode, isNil, Metadata, PlatformId, ProjectId, SeekPage, spreadIfDefined, UserId } from '@activepieces/core-utils'
 import { apDayjs } from '@activepieces/server-utils'
-import { AppConnectionScope, PiecesFilterType, PrincipalType, Project, ProjectType, ProjectWithLimits, UpdateProjectPlatformRequest } from '@activepieces/shared'
+import { AppConnectionScope, PiecesFilterType, PlatformProjectListItem, PrincipalType, Project, ProjectType, ProjectWithLimits, UpdateProjectPlatformRequest } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
 import { ArrayContains, Equal, ILike, In, IsNull } from 'typeorm'
 import { appConnectionsRepo } from '../../app-connection/app-connection-service/app-connection-service'
@@ -25,8 +25,8 @@ const projectRepo = repoFactory(ProjectEntity)
 const projectPlanRepo = repoFactory(ProjectPlanEntity)
 
 export const platformProjectService = (log: FastifyBaseLogger) => ({
-    async getForPlatform(params: GetAllForParamsAndUser): Promise<SeekPage<ProjectWithLimits>> {
-        const { cursorRequest, limit, platformId, displayName, externalId, externalUserId, userId, types, isPrivileged, principalType } = params
+    async getForPlatform(params: GetAllForParamsAndUser): Promise<SeekPage<PlatformProjectListItem>> {
+        const { cursorRequest, limit, platformId, displayName, externalId, externalUserId, userId, types, isPrivileged, principalType, includeGlobalConnectionsCount } = params
         const accessFilterUser = await resolveAccessFilterUser({ platformId, externalUserId, callerUserId: userId, callerIsPrivileged: isPrivileged, principalType, log })
         if (isNil(accessFilterUser)) {
             return paginationHelper.createPage<ProjectWithLimits>([], null)
@@ -66,7 +66,15 @@ export const platformProjectService = (log: FastifyBaseLogger) => ({
 
         const { data, cursor } = await paginator.paginate(queryBuilder)
         const projects: ProjectWithLimits[] = await enrichProjects(data, log)
-        return paginationHelper.createPage<ProjectWithLimits>(projects, cursor)
+        if (!includeGlobalConnectionsCount) {
+            return paginationHelper.createPage<PlatformProjectListItem>(projects, cursor)
+        }
+        const globalConnectionsCountMap = await countGlobalConnectionsByProjects({ platformId, projectIds: projects.map((project) => project.id) })
+        const projectsWithCount = projects.map((project) => ({
+            ...project,
+            globalConnectionsCount: globalConnectionsCountMap.get(project.id) ?? 0,
+        }))
+        return paginationHelper.createPage<PlatformProjectListItem>(projectsWithCount, cursor)
     },
     async create(params: CreateProjectParams): Promise<ProjectWithLimits> {
         const platformPlan = await platformPlanService(log).getOrCreateForPlatform(params.platformId)
@@ -309,6 +317,22 @@ async function enrichProjects(
     })
 }
 
+async function countGlobalConnectionsByProjects({ platformId, projectIds }: { platformId: PlatformId, projectIds: ProjectId[] }): Promise<Map<ProjectId, number>> {
+    if (projectIds.length === 0) {
+        return new Map()
+    }
+    const rows: { projectId: ProjectId, count: string }[] = await appConnectionsRepo().query(`
+        SELECT connection_project."projectId" AS "projectId", COUNT(*) AS count
+        FROM app_connection connection
+        CROSS JOIN LATERAL unnest(connection."projectIds") AS connection_project("projectId")
+        WHERE connection."platformId" = $1
+            AND connection.scope = $2
+            AND connection_project."projectId" = ANY($3::varchar[])
+        GROUP BY connection_project."projectId"
+    `, [platformId, AppConnectionScope.PLATFORM, projectIds])
+    return new Map(rows.map((row) => [row.projectId, Number(row.count)]))
+}
+
 async function resolveAccessFilterUser({ platformId, externalUserId, callerUserId, callerIsPrivileged, principalType, log }: ResolveAccessFilterUserParams): Promise<AccessFilterUser | null> {
     if (isNil(externalUserId)) {
         return { userId: callerUserId, isPrivileged: callerIsPrivileged }
@@ -373,6 +397,7 @@ type GetAllForParamsAndUser = {
     types?: ProjectType[]
     isPrivileged: boolean
     principalType?: PrincipalType
+    includeGlobalConnectionsCount?: boolean
 }
 
 type DeletePersonalProjectForUserParams = {

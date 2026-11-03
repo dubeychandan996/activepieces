@@ -410,4 +410,56 @@ describe('Platform Project Global Connections', () => {
             expect(updatedConn?.projectIds).toContain(newProject.id)
         })
     })
+
+    describe('List Projects with includeGlobalConnectionsCount', () => {
+
+        it('returns the number of global connections per project', async () => {
+            const { ctx, mockPieceMetadata } = await setupPlatformWithGlobalConnections()
+
+            const otherProjectRes = await app?.inject({
+                method: 'POST',
+                url: '/api/v1/projects',
+                headers: { authorization: `Bearer ${ctx.token}` },
+                body: { displayName: 'Other Project' },
+            })
+            const otherProject = otherProjectRes!.json()
+
+            await createGlobalConnection(ctx.token, {
+                pieceName: mockPieceMetadata.name,
+                pieceVersion: mockPieceMetadata.version,
+                projectIds: [ctx.project.id, otherProject.id],
+            })
+            await createGlobalConnection(ctx.token, {
+                pieceName: mockPieceMetadata.name,
+                pieceVersion: mockPieceMetadata.version,
+                projectIds: [ctx.project.id],
+            })
+
+            const response = await app?.inject({
+                method: 'GET',
+                url: '/api/v1/projects',
+                headers: { authorization: `Bearer ${ctx.token}` },
+                query: { includeGlobalConnectionsCount: 'true' },
+            })
+
+            expect(response?.statusCode).toBe(StatusCodes.OK)
+            const { data } = response!.json() as { data: { id: string, globalConnectionsCount?: number }[] }
+            expect(data.find((p) => p.id === ctx.project.id)?.globalConnectionsCount).toBe(2)
+            expect(data.find((p) => p.id === otherProject.id)?.globalConnectionsCount).toBe(1)
+        })
+
+        it('omits the count when not requested', async () => {
+            const { ctx } = await setupPlatformWithGlobalConnections()
+
+            const response = await app?.inject({
+                method: 'GET',
+                url: '/api/v1/projects',
+                headers: { authorization: `Bearer ${ctx.token}` },
+            })
+
+            expect(response?.statusCode).toBe(StatusCodes.OK)
+            const { data } = response!.json() as { data: { globalConnectionsCount?: number }[] }
+            expect(data.every((p) => p.globalConnectionsCount === undefined)).toBe(true)
+        })
+    })
 })

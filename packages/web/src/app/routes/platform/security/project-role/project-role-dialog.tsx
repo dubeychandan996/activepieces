@@ -2,8 +2,10 @@ import { ErrorCode, ProjectRole, RoleType } from '@activepieces/core-utils';
 import { t } from 'i18next';
 import { MoreHorizontal, Pencil, Trash, X } from 'lucide-react';
 import { ReactNode, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { adminLayout } from '@/app/components/admin';
+import { getPaginationQueryParams } from '@/components/custom/data-table';
 import { ConfirmationDeleteDialog } from '@/components/custom/delete-dialog';
 import EditableText from '@/components/custom/editable-text';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +33,10 @@ import {
   RoleBase,
   rolePermissionModel,
 } from '@/features/members/lib/role-permissions';
-import { projectRoleMutations } from '@/features/platform-admin';
+import {
+  PROJECT_ROLE_MEMBERS_PAGINATION_KEY,
+  projectRoleMutations,
+} from '@/features/platform-admin';
 import { AdminControl, adminControl } from '@/lib/admin-control';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -50,8 +55,22 @@ export const ProjectRoleDialog = ({
   initialTab = 'permissions',
 }: ProjectRoleDialogProps) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const [, setSearchParams] = useSearchParams();
   const isOpen = open ?? uncontrolledOpen;
   const setIsOpen = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      const { cursor } = getPaginationQueryParams(
+        PROJECT_ROLE_MEMBERS_PAGINATION_KEY,
+      );
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete(cursor);
+          return next;
+        },
+        { replace: true },
+      );
+    }
     if (open === undefined) {
       setUncontrolledOpen(nextOpen);
     }

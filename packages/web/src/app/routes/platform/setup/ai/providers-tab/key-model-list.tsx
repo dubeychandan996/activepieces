@@ -3,6 +3,7 @@ import {
   AIProviderModelType,
   AIProviderWithoutSensitiveData,
 } from '@activepieces/shared';
+import { ColumnDef } from '@tanstack/react-table';
 import { t } from 'i18next';
 import {
   Brain,
@@ -15,7 +16,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+import { DataTable, RowDataWithActions } from '@/components/custom/data-table';
 import { InputWithIcon } from '@/components/custom/input-with-icon';
+import { TextWithTooltip } from '@/components/custom/text-with-tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,11 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ModelCapabilityIcons } from '@/features/agents/ai-model/model-capability-icons';
 import { modelMeta } from '@/features/agents/ai-model/model-meta';
 import { cn } from '@/lib/utils';
-
-import { ModelDetailRow } from '../components/model-detail-row';
 
 import {
   keyModelFilters,
@@ -52,7 +53,6 @@ export function KeyModelList({
   const [capabilities, setCapabilities] = useState<ModelCapabilityFilter[]>([]);
   const [sort, setSort] = useState<ModelSort>('newest');
   const [selectedOnly, setSelectedOnly] = useState(false);
-  const [shown, setShown] = useState(PAGE_SIZE);
 
   const isOn = (modelId: string) =>
     allModels || selectedIds.includes(modelId) || tiersByModel.has(modelId);
@@ -64,7 +64,6 @@ export function KeyModelList({
     selectedOnly: selectedOnly && !allModels,
     selectedIds,
   });
-  const page = filtered.slice(0, shown);
   const filteredIds = filtered.map((model) => model.id);
   const onCount = allModels
     ? models.length
@@ -73,9 +72,9 @@ export function KeyModelList({
     provider: config.provider,
   }).name;
 
-  const resetPaging = () => setShown(PAGE_SIZE);
+  const isLocked = (modelId: string) => allModels || tiersByModel.has(modelId);
   const toggleModel = (modelId: string) => {
-    if (allModels || tiersByModel.has(modelId)) {
+    if (isLocked(modelId)) {
       return;
     }
     onChange(
@@ -90,8 +89,90 @@ export function KeyModelList({
         ? capabilities.filter((current) => current !== capability)
         : [...capabilities, capability],
     );
-    resetPaging();
   };
+
+  const columns: ColumnDef<RowDataWithActions<AIProviderModel>>[] = [
+    {
+      id: 'toggle',
+      size: 44,
+      header: () => null,
+      // The row click toggles the model, so the checkbox has no handler of its own.
+      cell: ({ row }) => (
+        <Checkbox
+          checked={isOn(row.original.id)}
+          disabled={isLocked(row.original.id)}
+          aria-label={row.original.name}
+        />
+      ),
+    },
+    {
+      accessorKey: 'name',
+      header: () => t('Model'),
+      cell: ({ row }) => (
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TextWithTooltip tooltipMessage={row.original.name}>
+            <span className="truncate text-sm font-medium">
+              {row.original.name}
+            </span>
+          </TextWithTooltip>
+          <ModelBadges
+            model={row.original}
+            stale={staleIds.includes(row.original.id)}
+            tierNames={tiersByModel.get(row.original.id)}
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'context',
+      size: 90,
+      header: () => t('Context'),
+      cell: ({ row }) => {
+        const tokens = row.original.metadata?.contextTokens;
+        return (
+          <span className="text-sm tabular-nums">
+            {tokens === undefined ? EMPTY : modelMeta.formatContext({ tokens })}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'price',
+      size: 140,
+      header: () => t('Price per 1M'),
+      cell: ({ row }) => {
+        const metadata = row.original.metadata;
+        if (
+          metadata?.inputCostPerMillionTokens === undefined ||
+          metadata.outputCostPerMillionTokens === undefined
+        ) {
+          return <span className="text-sm">{EMPTY}</span>;
+        }
+        return (
+          <span className="text-sm tabular-nums">
+            {modelMeta.formatPrice({
+              perMillion: metadata.inputCostPerMillionTokens,
+            })}
+            <span className="text-gray-10"> / </span>
+            {modelMeta.formatPrice({
+              perMillion: metadata.outputCostPerMillionTokens,
+            })}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'capabilities',
+      size: 130,
+      header: () => t('Capabilities'),
+      cell: ({ row }) => (
+        <ModelCapabilityIcons
+          provider={config.provider}
+          metadata={row.original.metadata}
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-gray-6/60">
@@ -100,19 +181,13 @@ export function KeyModelList({
           <InputWithIcon
             icon={<Search className="size-4 shrink-0 text-gray-11" />}
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              resetPaging();
-            }}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder={t('Search models')}
             className="max-w-xs grow-0"
           />
           <Select
             value={sort}
-            onValueChange={(value) => {
-              setSort(sortOf(value));
-              resetPaging();
-            }}
+            onValueChange={(value) => setSort(sortOf(value))}
           >
             <SelectTrigger className="w-40 shrink-0" aria-label={t('Sort')}>
               <SelectValue />
@@ -141,10 +216,7 @@ export function KeyModelList({
               icon={ListChecks}
               label={t('Selected only')}
               checked={selectedOnly}
-              onCheckedChange={(checked) => {
-                setSelectedOnly(checked);
-                resetPaging();
-              }}
+              onCheckedChange={setSelectedOnly}
             />
           )}
         </div>
@@ -192,76 +264,30 @@ export function KeyModelList({
         )}
       </div>
 
-      <div className="flex flex-col border-t border-gray-6/60">
-        {isLoading &&
-          [0, 1, 2].map((row) => (
-            <div
-              key={row}
-              className="flex items-center gap-3 border-b border-gray-6/60 px-4 py-3 last:border-b-0"
-            >
-              <Skeleton className="size-4 rounded-sm" />
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Skeleton className="h-3.5 w-40" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            </div>
-          ))}
-        {!isLoading && filtered.length === 0 && (
-          <p className="px-4 py-6 text-center text-sm text-gray-11">
-            {models.length === 0
+      <div className="border-t border-gray-6/60 [&_tbody_tr:last-child]:border-b-0 [&_thead]:border-t-0">
+        <DataTable
+          columns={columns}
+          page={{ data: filtered, next: null, previous: null }}
+          isLoading={isLoading}
+          isError={false}
+          errorStateEntity={t('models')}
+          clientPagination={true}
+          paginationKey="keyModels"
+          getRowId={(model) => model.id}
+          onRowClick={(model) => toggleModel(model.id)}
+          getRowClassName={(model) =>
+            isLocked(model.id) ? 'cursor-default hover:bg-transparent' : ''
+          }
+          emptyStateTextTitle={
+            models.length === 0
               ? t('No models found')
               : selectedOnly
               ? t('No model is selected yet.')
-              : t('No model matches your search.')}
-          </p>
-        )}
-        {!isLoading &&
-          page.map((model) => {
-            const tierNames = tiersByModel.get(model.id);
-            const locked = allModels || tierNames !== undefined;
-            return (
-              <label
-                key={model.id}
-                className={cn(
-                  'flex items-center gap-3 border-b border-gray-6/60 pl-4 pr-3 last:border-b-0',
-                  locked ? 'cursor-default' : 'cursor-pointer hover:bg-gray-2',
-                )}
-              >
-                <Checkbox
-                  checked={isOn(model.id)}
-                  disabled={locked}
-                  onCheckedChange={() => toggleModel(model.id)}
-                  aria-label={model.name}
-                />
-                <ModelDetailRow
-                  name={model.name}
-                  config={config}
-                  model={model}
-                  nested
-                  nameSuffix={
-                    <ModelBadges
-                      model={model}
-                      stale={staleIds.includes(model.id)}
-                      tierNames={tierNames}
-                    />
-                  }
-                />
-              </label>
-            );
-          })}
-        {filtered.length > page.length && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="m-2 self-start"
-            onClick={() => setShown((current) => current + PAGE_SIZE)}
-          >
-            {t('Show {count} more', {
-              count: Math.min(PAGE_SIZE, filtered.length - page.length),
-            })}
-          </Button>
-        )}
+              : t('No model matches your search.')
+          }
+          emptyStateTextDescription=""
+          emptyStateIcon={null}
+        />
       </div>
     </div>
   );
@@ -360,7 +386,7 @@ function capabilityLabel(capability: ModelCapabilityFilter): string {
   }
 }
 
-const PAGE_SIZE = 20;
+const EMPTY = '—';
 
 const SORTS: ModelSort[] = ['newest', 'cheapest', 'context', 'name'];
 

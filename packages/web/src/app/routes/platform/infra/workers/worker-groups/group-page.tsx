@@ -14,15 +14,17 @@ import { cn } from '@/lib/utils';
 import { AddItemsDialog } from './add-items-dialog';
 import { groupUtils } from './hooks';
 import { MoveAllDialog } from './move-all-dialog';
-import { FlowsTable, ProjectsTable } from './tables';
+import {
+  FlowsTable,
+  ProjectsTable,
+  WORKER_GROUP_FLOWS_PAGINATION_KEY,
+} from './tables';
 
 export function GroupPage({
   overview,
   groupKey,
   search,
   onSearchChange,
-  cursor,
-  onCursorChange,
   onBack,
   onOpenFlows,
   showRunLimit,
@@ -31,8 +33,6 @@ export function GroupPage({
   groupKey: string;
   search: string;
   onSearchChange: (value: string) => void;
-  cursor: string | undefined;
-  onCursorChange: (cursor: string | undefined) => void;
   onBack: () => void;
   onOpenFlows: (project: WorkerGroupProjectAssignment) => void;
   showRunLimit: boolean;
@@ -161,6 +161,7 @@ export function GroupPage({
         <FlowsTable
           overview={overview}
           group={label}
+          paginationKey={WORKER_GROUP_FLOWS_PAGINATION_KEY}
           showRemove
           emptyText={t(
             'No flows run on this group yet. Use Add flows to pick some.',
@@ -172,8 +173,6 @@ export function GroupPage({
           label={label}
           search={search}
           onSearchChange={onSearchChange}
-          cursor={cursor}
-          onCursorChange={onCursorChange}
           onOpenFlows={onOpenFlows}
           showRunLimit={showRunLimit}
           showRemove={!isShared}

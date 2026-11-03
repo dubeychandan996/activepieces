@@ -2,6 +2,7 @@ import { isNil, omit, SeekPage } from '@activepieces/core-utils';
 import {
   CreatePlatformProjectRequest,
   ListProjectRequestForPlatformQueryParams,
+  PlatformProjectListItem,
   UpdateProjectPlatformRequest,
   ProjectType,
   ProjectWithLimits,
@@ -23,13 +24,16 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
+import { readPaginationFromSearchParams } from '@/components/custom/data-table';
 import { useEmbedding } from '@/components/providers/embed-provider';
 import { api } from '@/lib/api';
 import { authenticationSession } from '@/lib/authentication-session';
 
 const collectionQueryClient = new QueryClient();
+
+const PLATFORM_PROJECTS_PAGE_QUERY_KEY = 'platform-projects-page';
 
 export const projectCollection = createCollection<ProjectWithLimits, string>(
   queryCollectionOptions({
@@ -98,12 +102,16 @@ export const projectCollectionUtils = {
     onSuccess: (project: ProjectWithLimits) => void,
     onError: (error: Error) => void,
   ) => {
+    const queryClient = useQueryClient();
     return useMutation({
       mutationFn: (request: CreatePlatformProjectRequest) =>
         api.post<ProjectWithLimits>('/v1/projects', request),
       onSuccess: async (data) => {
         await projectCollection.preload();
         projectCollection.utils.writeInsert(data);
+        await queryClient.invalidateQueries({
+          queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY],
+        });
         onSuccess(data);
       },
       onError: (error) => {
@@ -115,6 +123,7 @@ export const projectCollectionUtils = {
     onSuccess: () => void,
     onError: (error: Error) => void,
   ) => {
+    const queryClient = useQueryClient();
     return useMutation({
       mutationFn: ({
         projectId,
@@ -126,6 +135,9 @@ export const projectCollectionUtils = {
       onSuccess: async (data) => {
         await projectCollection.preload();
         projectCollection.utils.writeUpdate(data);
+        await queryClient.invalidateQueries({
+          queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY],
+        });
         onSuccess();
       },
       onError,
@@ -163,7 +175,7 @@ export const projectCollectionUtils = {
     });
   },
   delete: (projectIds: string[]) => {
-    projectCollection.delete(projectIds);
+    return projectCollection.delete(projectIds);
   },
   refetchProjects: () => {
     authoritativeProjectsGeneration += 1;
@@ -320,6 +332,31 @@ export const getProjectName = (
     : project.displayName;
 };
 export const projectHooks = {
+  usePlatformProjectsPage: () => {
+    const [searchParams] = useSearchParams();
+    return useQuery({
+      queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY, searchParams.toString()],
+      queryFn: () => {
+        const { cursor, limit } = readPaginationFromSearchParams(searchParams);
+        const types = searchParams.getAll('type') as ProjectType[];
+        const request: ListProjectRequestForPlatformQueryParams = {
+          cursor,
+          limit,
+          displayName: searchParams.get('displayName') ?? undefined,
+          types: types.length > 0 ? types : undefined,
+          includeGlobalConnectionsCount: true,
+        };
+        return api.get<SeekPage<PlatformProjectListItem>>(
+          '/v1/projects',
+          request,
+        );
+      },
+    });
+  },
+  invalidatePlatformProjectsPage: (queryClient: QueryClient) =>
+    queryClient.invalidateQueries({
+      queryKey: [PLATFORM_PROJECTS_PAGE_QUERY_KEY],
+    }),
   useProjectsForPlatforms: () => {
     return useQuery<ProjectWithLimitsWithPlatform[], Error>({
       queryKey: ['projects-for-platforms'],

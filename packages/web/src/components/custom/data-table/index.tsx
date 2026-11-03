@@ -249,8 +249,7 @@ export function DataTable<
 
   const [searchParams, setSearchParams] = useSearchParams();
   const paginationParams = getPaginationQueryParams(paginationKey);
-  const startingCursor =
-    searchParams.get(paginationParams.cursor) || undefined;
+  const startingCursor = searchParams.get(paginationParams.cursor) || undefined;
   const startingLimit =
     searchParams.get(paginationParams.limit) || `${DEFAULT_PAGE_SIZE}`;
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(

@@ -40,6 +40,7 @@ export {
   projectRoleQueries,
   projectRoleMutations,
   projectRoleKeys,
+  PROJECT_ROLE_MEMBERS_PAGINATION_KEY,
 } from './hooks/project-role-hooks';
 export {
   aiProviderQueries,

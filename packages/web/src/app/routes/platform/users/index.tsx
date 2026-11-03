@@ -1,16 +1,19 @@
+import { isNil, SeekPage } from '@activepieces/core-utils';
 import {
   UserInvitation,
   UserStatus,
   UserWithMetaInformation,
 } from '@activepieces/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { t } from 'i18next';
-import { Gem, User } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Gem, Mail, User } from 'lucide-react';
+import { useState } from 'react';
 
 import {
   AdminDataTable,
   AdminPage,
   AdminPageHeader,
+  AdminSection,
   adminPageResources,
 } from '@/app/components/admin';
 import { UserRoundPlusIcon } from '@/components/icons/user-round-plus';
@@ -19,13 +22,18 @@ import { internalErrorToast } from '@/components/ui/sonner';
 import { useSeatLimitGuard } from '@/features/billing';
 import { InviteUserDialog } from '@/features/members';
 import {
+  INVITATIONS_PAGINATION_KEY,
   platformUserHooks,
+  platformUserKeys,
   platformUserMutations,
 } from '@/features/platform-admin/hooks/platform-user-hooks';
 import { AdminControl, adminControl } from '@/lib/admin-control';
 
 import { UserActions } from './actions/user-actions';
-import { createUsersTableColumns } from './columns';
+import {
+  createInvitationsTableColumns,
+  createUsersTableColumns,
+} from './columns';
 
 export type UserRowData =
   | {
@@ -44,45 +52,37 @@ export default function UsersPage() {
   const { isOutOfSeats, handleSeatLimitError, seatLimitDialog } =
     useSeatLimitGuard();
 
-  const {
-    data: usersData,
-    isLoading: usersLoading,
-    isError: usersError,
-    refetch: refetchUsers,
-  } = platformUserHooks.useUsers();
-
-  const {
-    data: invitationsData,
-    isLoading: invitationsLoading,
-    isError: invitationsError,
-    refetch: refetchInvitations,
-  } = platformUserHooks.usePlatformInvitations();
+  const queryClient = useQueryClient();
+  const usersQuery = platformUserHooks.useUsersPage();
+  const invitationsQuery = platformUserHooks.useInvitationsPage();
 
   const refetch = () => {
-    refetchUsers();
-    refetchInvitations();
+    queryClient.invalidateQueries({ queryKey: platformUserKeys.users });
+    queryClient.invalidateQueries({ queryKey: platformUserKeys.invitations });
   };
 
-  const combinedData: UserRowData[] = useMemo(() => {
-    const users: UserRowData[] =
-      usersData?.data?.map((user) => ({
-        id: user.id,
-        type: 'user' as const,
-        data: user,
-      })) ?? [];
-
-    const pendingInvitations: UserRowData[] =
-      invitationsData?.map((invitation) => ({
+  const usersPage: SeekPage<UserRowData> | undefined = usersQuery.data && {
+    ...usersQuery.data,
+    data: usersQuery.data.data.map((user) => ({
+      id: user.id,
+      type: 'user' as const,
+      data: user,
+    })),
+  };
+  const invitationsPage: SeekPage<UserRowData> | undefined =
+    invitationsQuery.data && {
+      ...invitationsQuery.data,
+      data: invitationsQuery.data.data.map((invitation) => ({
         id: invitation.id,
         type: 'invitation' as const,
         data: invitation,
-      })) ?? [];
+      })),
+    };
 
-    return [...users, ...pendingInvitations];
-  }, [usersData, invitationsData]);
-
-  const isLoading = usersLoading || invitationsLoading;
-  const isError = usersError || invitationsError;
+  const hasInvitations =
+    invitationsQuery.isError ||
+    (invitationsQuery.data?.data.length ?? 0) > 0 ||
+    !isNil(invitationsQuery.data?.previous);
 
   const { mutate: deleteUser } = platformUserMutations.useDeleteUser({
     onSuccess: refetch,
@@ -119,7 +119,17 @@ export default function UsersPage() {
     });
   };
 
-  const columns = createUsersTableColumns();
+  const userActions = [
+    (row: UserRowData) => (
+      <UserActions
+        row={row}
+        isUpdatingStatus={isUpdatingStatus}
+        onDelete={handleDelete}
+        onToggleStatus={handleToggleStatus}
+        onUpdate={refetch}
+      />
+    ),
+  ];
 
   return (
     <AdminPage>
@@ -142,33 +152,39 @@ export default function UsersPage() {
           {t('Invite')}
         </Button>
       </AdminPageHeader>
-      <AdminDataTable
-        emptyStateTextTitle={t('No users found')}
-        emptyStateTextDescription={t('Start inviting users to your project')}
-        emptyStateIcon={<User />}
-        columns={columns}
-        page={{
-          data: combinedData,
-          next: usersData?.next || null,
-          previous: usersData?.previous || null,
-        }}
-        hidePagination={true}
-        isLoading={isLoading}
-        isError={isError}
-        errorStateEntity={t('users')}
-        onRetry={refetch}
-        actions={[
-          (row) => (
-            <UserActions
-              row={row}
-              isUpdatingStatus={isUpdatingStatus}
-              onDelete={handleDelete}
-              onToggleStatus={handleToggleStatus}
-              onUpdate={refetch}
-            />
-          ),
-        ]}
-      />
+      {hasInvitations && (
+        <AdminSection title={t('Pending invitations')}>
+          <AdminDataTable
+            paginationKey={INVITATIONS_PAGINATION_KEY}
+            emptyStateTextTitle={t('No pending invitations')}
+            emptyStateTextDescription={t(
+              'Start inviting users to your project',
+            )}
+            emptyStateIcon={<Mail />}
+            columns={createInvitationsTableColumns()}
+            page={invitationsPage}
+            isLoading={invitationsQuery.isLoading}
+            isError={invitationsQuery.isError}
+            errorStateEntity={t('invitations')}
+            onRetry={refetch}
+            actions={userActions}
+          />
+        </AdminSection>
+      )}
+      <AdminSection title={hasInvitations ? t('Users') : undefined}>
+        <AdminDataTable
+          emptyStateTextTitle={t('No users found')}
+          emptyStateTextDescription={t('Start inviting users to your project')}
+          emptyStateIcon={<User />}
+          columns={createUsersTableColumns()}
+          page={usersPage}
+          isLoading={usersQuery.isLoading}
+          isError={usersQuery.isError}
+          errorStateEntity={t('users')}
+          onRetry={refetch}
+          actions={userActions}
+        />
+      </AdminSection>
       <InviteUserDialog
         open={inviteOpen}
         setOpen={setInviteOpen}

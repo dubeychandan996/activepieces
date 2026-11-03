@@ -14,7 +14,11 @@ import {
   adminPageResources,
 } from '@/app/components/admin';
 import { AnimatedIconButton } from '@/components/custom/animated-icon-button';
-import { RowDataWithActions, BulkAction } from '@/components/custom/data-table';
+import {
+  RowDataWithActions,
+  BulkAction,
+  readPaginationFromSearchParams,
+} from '@/components/custom/data-table';
 import { DataTableColumnHeader } from '@/components/custom/data-table/data-table-column-header';
 import { ConfirmationDeleteDialog } from '@/components/custom/delete-dialog';
 import { FormattedDate } from '@/components/custom/formatted-date';
@@ -44,8 +48,11 @@ const PlatformTemplatesPage = () => {
     queryKey: ['templates', searchParams.toString()],
     staleTime: 0,
     queryFn: () => {
+      const { cursor, limit } = readPaginationFromSearchParams(searchParams);
       return templatesApi.list({
         type: TemplateType.CUSTOM,
+        cursor,
+        limit,
       });
     },
   });
@@ -225,7 +232,6 @@ const PlatformTemplatesPage = () => {
         emptyStateIcon={<FileText />}
         columns={columnsWithCheckbox}
         page={isSample ? sampleData.templatesPage() : data}
-        hidePagination={true}
         isLoading={isLoading}
         isError={isError}
         errorStateEntity={t('templates')}

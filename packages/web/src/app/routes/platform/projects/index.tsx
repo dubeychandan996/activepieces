@@ -1,4 +1,5 @@
-import { ProjectType, ProjectWithLimits } from '@activepieces/shared';
+import { PlatformProjectListItem, ProjectType } from '@activepieces/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { ColumnDef } from '@tanstack/react-table';
 import { t } from 'i18next';
 import { CheckIcon, Package, Pencil, Trash } from 'lucide-react';
@@ -21,11 +22,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { globalConnectionsQueries } from '@/features/connections';
 import {
   CreateProjectButton,
   EditProjectDialog,
   projectCollectionUtils,
+  projectHooks,
 } from '@/features/projects';
 import { PlatformAdminProjectAlertSubscriptionBulkActions } from '@/features/projects/components/platform-admin-project-alert-subscription-bulk-actions';
 import { platformHooks } from '@/hooks/platform-hooks';
@@ -39,6 +40,7 @@ import { projectsTableColumns } from './columns';
 export default function ProjectsPage() {
   const { platform } = platformHooks.useCurrentPlatform();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { project: currentProject } =
     projectCollectionUtils.useCurrentProject();
@@ -63,43 +65,23 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  const displayNameFilter = searchParams.get('displayName') || undefined;
-  const typeFilter = searchParams.getAll('type');
+  const {
+    data: projectsPage,
+    isLoading,
+    isError,
+  } = projectHooks.usePlatformProjectsPage();
+  const { data: teamProjects } = projectCollectionUtils.useAllPlatformProjects({
+    type: [ProjectType.TEAM],
+  });
 
-  const filters = useMemo(
-    () => ({
-      displayName: displayNameFilter,
-      type:
-        typeFilter.length > 0
-          ? typeFilter.map((t) => t as ProjectType)
-          : undefined,
-    }),
-    [displayNameFilter, typeFilter.join(',')],
+  const [selectedRows, setSelectedRows] = useState<PlatformProjectListItem[]>(
+    [],
   );
-
-  const { data: allProjects } =
-    projectCollectionUtils.useAllPlatformProjects(filters);
-
-  const [selectedRows, setSelectedRows] = useState<ProjectWithLimits[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogProjectId, setEditDialogProjectId] = useState<string>('');
-  const editDialogProject = allProjects.find(
+  const editDialogProject = projectsPage?.data.find(
     (project) => project.id === editDialogProjectId,
   );
-  const { data: allGlobalConnectionsPage } =
-    globalConnectionsQueries.useGlobalConnections({
-      request: { limit: 9999 },
-      extraKeys: [],
-    });
-  const allProjectsWithGlobalConnectionsCount = useMemo(() => {
-    return allProjects.map((project) => ({
-      ...project,
-      globalConnectionsCount:
-        allGlobalConnectionsPage?.data?.filter((connection) =>
-          connection.projectIds.includes(project.id),
-        ).length ?? 0,
-    }));
-  }, [allProjects, allGlobalConnectionsPage?.data]);
   const columns = useMemo(
     () =>
       projectsTableColumns({
@@ -109,7 +91,7 @@ export default function ProjectsPage() {
   );
 
   const columnsWithCheckbox: ColumnDef<
-    RowDataWithActions<ProjectWithLimits & { globalConnectionsCount: number }>
+    RowDataWithActions<PlatformProjectListItem>
   >[] = [
     {
       id: 'select',
@@ -215,11 +197,11 @@ export default function ProjectsPage() {
     ...columns,
   ];
 
-  const bulkActions: BulkAction<ProjectWithLimits>[] = useMemo(
+  const bulkActions: BulkAction<PlatformProjectListItem>[] = useMemo(
     () => [
       {
         render: (
-          _: RowDataWithActions<ProjectWithLimits>[],
+          _: RowDataWithActions<PlatformProjectListItem>[],
           resetSelection: () => void,
         ) => (
           <PlatformAdminProjectAlertSubscriptionBulkActions
@@ -233,7 +215,7 @@ export default function ProjectsPage() {
       },
       {
         render: (
-          _: RowDataWithActions<ProjectWithLimits>[],
+          _: RowDataWithActions<PlatformProjectListItem>[],
           resetSelection: () => void,
         ) => {
           const deletableProjects = selectedRows.filter(
@@ -291,11 +273,15 @@ export default function ProjectsPage() {
                       })}
                       controlId={AdminControl.PROJECTS_DELETE_CONFIRM}
                       mutationFn={async () => {
-                        projectCollectionUtils.delete(
+                        const transaction = projectCollectionUtils.delete(
                           deletableProjects.map((row) => row.id),
                         );
                         resetSelection();
                         setSelectedRows([]);
+                        await transaction.isPersisted.promise;
+                        await projectHooks.invalidatePlatformProjectsPage(
+                          queryClient,
+                        );
                       }}
                       onError={(error) => {
                         toast.error(t('Error'), {
@@ -332,7 +318,7 @@ export default function ProjectsPage() {
         },
       },
     ],
-    [selectedRows, currentProject, defaultProjectIds],
+    [selectedRows, currentProject, defaultProjectIds, queryClient],
   );
 
   const errorToastMessage = (error: unknown): string | undefined => {
@@ -351,7 +337,7 @@ export default function ProjectsPage() {
   };
 
   const actions = [
-    (row: ProjectWithLimits) => {
+    (row: PlatformProjectListItem) => {
       return (
         <div className="flex items-end justify-end">
           <Tooltip>
@@ -384,7 +370,7 @@ export default function ProjectsPage() {
         description={t('Manage your automation projects')}
         resources={adminPageResources.projects}
       >
-        <CreateProjectButton variant="full" projects={allProjects} />
+        <CreateProjectButton variant="full" projects={teamProjects} />
       </AdminPageHeader>
       <AdminDataTable
         emptyStateTextTitle={t('No projects found')}
@@ -420,15 +406,10 @@ export default function ProjectsPage() {
           },
         ]}
         columns={columnsWithCheckbox}
-        page={{
-          data: allProjectsWithGlobalConnectionsCount,
-          next: null,
-          previous: null,
-        }}
-        isLoading={false}
-        isError={false}
+        page={projectsPage}
+        isLoading={isLoading}
+        isError={isError}
         errorStateEntity={t('projects')}
-        clientPagination={true}
         bulkActions={bulkActions}
         actions={actions}
       />

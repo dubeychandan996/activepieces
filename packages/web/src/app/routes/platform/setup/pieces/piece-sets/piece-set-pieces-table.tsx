@@ -327,8 +327,7 @@ export const PieceSetPiecesTable = ({ pieceSet }: PieceSetPiecesTableProps) => {
         selectColumn={true}
         getRowId={(piece) => piece.name}
         onRowClick={openPieceOrPromptInclude}
-        virtualizeRows={true}
-        hidePagination={true}
+        clientPagination={true}
       />
       {managingComponentsPiece && (
         <PieceActionsAndTriggersSheet

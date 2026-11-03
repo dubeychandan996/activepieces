@@ -1,5 +1,5 @@
 import { ActivepiecesError, assertNotNullOrUndefined, ErrorCode, isNil, Permission, SeekPage } from '@activepieces/core-utils'
-import { CreatePlatformProjectRequest, ListProjectRequestForPlatformQueryParams, PlatformRole, Principal, PrincipalType, ProjectType, ProjectWithLimits, SERVICE_KEY_SECURITY_OPENAPI, UpdateProjectPlatformRequest } from '@activepieces/shared'
+import { CreatePlatformProjectRequest, ListProjectRequestForPlatformQueryParams, PlatformProjectListItem, PlatformRole, Principal, PrincipalType, ProjectType, ProjectWithLimits, SERVICE_KEY_SECURITY_OPENAPI, UpdateProjectPlatformRequest } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { StatusCodes } from 'http-status-codes'
@@ -52,6 +52,7 @@ export const platformProjectController: FastifyPluginAsyncZod = async (app) => {
             userId,
             isPrivileged: userService(request.log).isUserPrivileged(user),
             principalType: request.principal.type,
+            includeGlobalConnectionsCount: request.query.includeGlobalConnectionsCount,
         })
     })
 
@@ -225,7 +226,7 @@ const ListProjectRequestForPlatform = {
     },
     schema: {
         response: {
-            [StatusCodes.OK]: SeekPage(ProjectWithLimits),
+            [StatusCodes.OK]: SeekPage(PlatformProjectListItem),
         },
         querystring: ListProjectRequestForPlatformQueryParams,
         tags: ['projects'],

@@ -160,6 +160,13 @@ way back was to stash the handful of intended edits, `git checkout` the package,
   surfaces that have no spacing of their own, a card grid or a form, and not on a table. Bit the Projects
   and Users pages during the admin alignment pass, where the table was inset while its own toolbar was not.
 
+- **Admin tables all paginate through `DataTable`'s own footer.** An unbounded list (users, projects,
+  templates) pages on the server: the hook reads `readPaginationFromSearchParams(searchParams)` and keys the
+  query on `searchParams.toString()`, and search and filters go to the server too, since filtering in the
+  browser would only see the current page. A small bounded list (a capped health list, a fixed catalog) uses
+  `clientPagination` instead. Two paged tables on one page each get a `paginationKey`, or they share the
+  `cursor` / `limit` URL params and page each other.
+
 - **Those two shells carry the page's layout, not just its header, so removing a header moves the content.**
   `CenteredPage` supplies `mx-auto` centring and a 40rem column; `DashboardPageHeader` supplies nothing, so
   its pages run flush to the container edge. Take the header away to hoist the title somewhere shared and

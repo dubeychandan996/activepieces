@@ -1,10 +1,13 @@
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { t } from 'i18next';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+
+import { readPaginationFromSearchParams } from '@/components/custom/data-table';
 
 import { projectRoleApi } from '../api/project-role-api';
 
-const PROJECT_ROLE_MEMBERS_PAGE_SIZE = 100;
+export const PROJECT_ROLE_MEMBERS_PAGINATION_KEY = 'roleMembers';
 
 export const projectRoleKeys = {
   all: ['project-roles'] as const,
@@ -18,18 +21,19 @@ export const projectRoleQueries = {
       queryFn: () => projectRoleApi.list(),
       enabled,
     }),
-  useProjectRoleMembers: (roleId: string | undefined, enabled: boolean) =>
-    useInfiniteQuery({
-      queryKey: projectRoleKeys.members(roleId ?? ''),
-      queryFn: ({ pageParam }) =>
-        projectRoleApi.listProjectMembers(roleId!, {
-          cursor: pageParam,
-          limit: PROJECT_ROLE_MEMBERS_PAGE_SIZE,
-        }),
-      initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage) => lastPage.next ?? undefined,
+  useProjectRoleMembers: (roleId: string | undefined, enabled: boolean) => {
+    const [searchParams] = useSearchParams();
+    const { cursor, limit } = readPaginationFromSearchParams(
+      searchParams,
+      PROJECT_ROLE_MEMBERS_PAGINATION_KEY,
+    );
+    return useQuery({
+      queryKey: [...projectRoleKeys.members(roleId ?? ''), cursor, limit],
+      queryFn: () =>
+        projectRoleApi.listProjectMembers(roleId!, { cursor, limit }),
       enabled: enabled && !!roleId,
-    }),
+    });
+  },
 };
 
 export const projectRoleMutations = {

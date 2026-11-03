@@ -453,9 +453,10 @@ const KEYS = {
 
 export const PAGE_SIZE = 50;
 const SEARCH_PAGE_SIZE = 10;
-export const PROJECT_FLOWS_PAGE_SIZE = 20;
+const PROJECT_FLOWS_PAGE_SIZE = 20;
 
 type ProjectListParams = {
+  limit?: number;
   group?: string;
   filter?: 'all' | 'shared';
   exclude?: string;

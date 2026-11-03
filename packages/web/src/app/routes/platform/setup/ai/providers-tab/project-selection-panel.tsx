@@ -13,7 +13,6 @@ import { InputWithIcon } from '@/components/custom/input-with-icon';
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { SelectedOnlyButton } from '../components/selected-only-button';
-import { pageSlice, TablePagination } from '../components/table-pagination';
 
 export function ProjectSelectionPanel({
   projects,
@@ -25,7 +24,6 @@ export function ProjectSelectionPanel({
   onChange: (projectIds: string[]) => void;
 }) {
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
   const filtered = projects
@@ -33,14 +31,6 @@ export function ProjectSelectionPanel({
       project.displayName.toLowerCase().includes(search.trim().toLowerCase()),
     )
     .filter((project) => !showSelectedOnly || selectedIds.includes(project.id));
-  const { rows, page: currentPage } = pageSlice({
-    items: filtered,
-    page,
-    pageSize: PAGE_SIZE,
-  });
-  const allRowsSelected =
-    rows.length > 0 &&
-    rows.every((project) => selectedIds.includes(project.id));
 
   const toggleProject = (projectId: string) => {
     onChange(
@@ -49,24 +39,33 @@ export function ProjectSelectionPanel({
         : [...selectedIds, projectId],
     );
   };
-  const toggleRows = () => {
-    const rowIds = rows.map((project) => project.id);
+  const togglePageRows = (pageRows: Project[]) => {
+    const rowIds = pageRows.map((project) => project.id);
     onChange(
-      allRowsSelected
+      allSelected(pageRows)
         ? selectedIds.filter((id) => !rowIds.includes(id))
         : [...new Set([...selectedIds, ...rowIds])],
     );
   };
+  const allSelected = (pageRows: Project[]) =>
+    pageRows.length > 0 &&
+    pageRows.every((project) => selectedIds.includes(project.id));
 
   const columns: ColumnDef<RowDataWithActions<Project>>[] = [
     {
       accessorKey: 'name',
-      header: () => (
-        <div className="flex items-center gap-2.5">
-          <Checkbox checked={allRowsSelected} onCheckedChange={toggleRows} />
-          <span>{t('Project')}</span>
-        </div>
-      ),
+      header: ({ table }) => {
+        const pageRows = table.getRowModel().rows.map((row) => row.original);
+        return (
+          <div className="flex items-center gap-2.5">
+            <Checkbox
+              checked={allSelected(pageRows)}
+              onCheckedChange={() => togglePageRows(pageRows)}
+            />
+            <span>{t('Project')}</span>
+          </div>
+        );
+      },
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5">
           <Checkbox
@@ -93,29 +92,25 @@ export function ProjectSelectionPanel({
         <InputWithIcon
           icon={<Search className="size-4 shrink-0 text-gray-11" />}
           value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPage(0);
-          }}
+          onChange={(event) => setSearch(event.target.value)}
           placeholder={t('Search {count} projects', { count: projects.length })}
           className="max-w-xs grow-0"
         />
         <SelectedOnlyButton
           pressed={showSelectedOnly}
-          onToggle={() => {
-            setShowSelectedOnly(!showSelectedOnly);
-            setPage(0);
-          }}
+          onToggle={() => setShowSelectedOnly(!showSelectedOnly)}
         />
       </div>
       <div className="border-t border-gray-6/60 [&_tbody_tr:last-child]:border-b-0 [&_thead]:border-t-0">
         <DataTable
           columns={columns}
-          page={{ data: rows, next: null, previous: null }}
+          page={{ data: filtered, next: null, previous: null }}
           isLoading={false}
           isError={false}
           errorStateEntity={t('projects')}
-          hidePagination={true}
+          clientPagination={true}
+          paginationKey="projectSelection"
+          getRowId={(project) => project.id}
           onRowClick={(row) => toggleProject(row.id)}
           emptyStateTextTitle={t('No projects found')}
           emptyStateTextDescription={
@@ -126,13 +121,6 @@ export function ProjectSelectionPanel({
           emptyStateIcon={<FolderOpen className="size-10 text-gray-11" />}
         />
       </div>
-      <TablePagination
-        page={currentPage}
-        pageSize={PAGE_SIZE}
-        total={filtered.length}
-        onPageChange={setPage}
-        className="border-t border-gray-6/60 p-3"
-      />
     </div>
   );
 }
@@ -154,5 +142,3 @@ export function ProjectSwatch({ project }: { project: Project }) {
     </span>
   );
 }
-
-const PAGE_SIZE = 10;

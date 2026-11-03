@@ -1,29 +1,54 @@
 import { StuckJob } from '@activepieces/shared';
+import { ColumnDef } from '@tanstack/react-table';
 import { t } from 'i18next';
 import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { SettingsPanel } from '@/app/components/admin';
+import { DataTable, RowDataWithActions } from '@/components/custom/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatUtils } from '@/lib/format-utils';
+
+type StuckJobRow = StuckJob & { id: string };
 
 type StuckJobsTableProps = {
   stuckJobs: StuckJob[] | undefined;
   isLoading: boolean;
 };
 
+const columns: ColumnDef<RowDataWithActions<StuckJobRow>>[] = [
+  {
+    accessorKey: 'flowName',
+    header: () => t('Flow'),
+    cell: ({ row }) => (
+      <span className="font-medium">{row.original.flowName}</span>
+    ),
+  },
+  {
+    accessorKey: 'projectName',
+    header: () => t('Project'),
+    cell: ({ row }) => (
+      <span className="text-gray-11">{row.original.projectName}</span>
+    ),
+  },
+  {
+    accessorKey: 'status',
+    header: () => t('Status'),
+    cell: ({ row }) => (
+      <Badge variant="outline">
+        {formatUtils.convertEnumToHumanReadable(row.original.status)}
+      </Badge>
+    ),
+  },
+];
+
 export function StuckJobsTable({ stuckJobs, isLoading }: StuckJobsTableProps) {
   const navigate = useNavigate();
-  const jobs = stuckJobs ?? [];
+  const jobs: StuckJobRow[] = (stuckJobs ?? []).map((job) => ({
+    ...job,
+    id: job.flowRunId,
+  }));
 
   return (
     <SettingsPanel
@@ -45,36 +70,22 @@ export function StuckJobsTable({ stuckJobs, isLoading }: StuckJobsTableProps) {
           <p className="text-sm">{t('No stuck jobs')}</p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Flow')}</TableHead>
-              <TableHead>{t('Project')}</TableHead>
-              <TableHead>{t('Status')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {jobs.map((job) => (
-              <TableRow
-                key={job.flowRunId}
-                className="cursor-pointer"
-                onClick={() =>
-                  navigate(`/projects/${job.projectId}/runs/${job.flowRunId}`)
-                }
-              >
-                <TableCell className="font-medium">{job.flowName}</TableCell>
-                <TableCell className="text-gray-11">
-                  {job.projectName}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {formatUtils.convertEnumToHumanReadable(job.status)}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={columns}
+          page={{ data: jobs, next: null, previous: null }}
+          isLoading={false}
+          isError={false}
+          errorStateEntity={t('stuck jobs')}
+          emptyStateTextTitle={t('No stuck jobs')}
+          emptyStateTextDescription=""
+          emptyStateIcon={<CircleCheck />}
+          getRowId={(job) => job.id}
+          onRowClick={(job) =>
+            navigate(`/projects/${job.projectId}/runs/${job.flowRunId}`)
+          }
+          clientPagination={true}
+          paginationKey="stuckJobs"
+        />
       )}
     </SettingsPanel>
   );

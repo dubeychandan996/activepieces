@@ -7,7 +7,6 @@ import {
   Shield,
   Clock,
   Activity,
-  Info,
   Mail,
   Hash,
 } from 'lucide-react';
@@ -17,12 +16,6 @@ import { RowDataWithActions } from '@/components/custom/data-table';
 import { DataTableColumnHeader } from '@/components/custom/data-table/data-table-column-header';
 import { TruncatedColumnTextValue } from '@/components/custom/data-table/truncated-column-text-value';
 import { FormattedDate } from '@/components/custom/formatted-date';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 
 import { UserRowData } from './index';
 
@@ -42,52 +35,32 @@ export const createUsersTableColumns = (): ColumnDefWithAccessorKey[] => [
       />
     ),
     cell: ({ row }) => {
-      const isInvitation = row.original.type === 'invitation';
       const externalId =
         row.original.type === 'user' ? row.original.data.externalId : undefined;
       const email = row.original.data.email;
       const showEmail = email?.includes('@');
 
       return (
-        <div className="flex items-center gap-2">
-          {isInvitation && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="size-4 text-gray-11" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{t('Pending Invitation')}</p>
-              </TooltipContent>
-            </Tooltip>
+        <div className="flex flex-col gap-0.5">
+          {showEmail && (
+            <div className="flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 shrink-0 text-gray-11" />
+              <TruncatedColumnTextValue
+                value={email}
+                className="max-w-[200px] 2xl:max-w-[280px]"
+              />
+            </div>
           )}
-          <div
-            className={cn(
-              'flex flex-col gap-0.5',
-              isInvitation && 'text-gray-11',
-            )}
-          >
-            {showEmail && (
-              <div className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 shrink-0 text-gray-11" />
-                <TruncatedColumnTextValue
-                  value={email}
-                  className="max-w-[200px] 2xl:max-w-[280px]"
-                />
-              </div>
-            )}
-            {externalId && (
-              <div className="flex items-center gap-1.5">
-                <Hash className="h-3.5 w-3.5 shrink-0 text-gray-11" />
-                <TruncatedColumnTextValue
-                  value={externalId}
-                  className="max-w-[200px] 2xl:max-w-[280px]"
-                />
-              </div>
-            )}
-            {!showEmail && !externalId && (
-              <span className="text-gray-11">-</span>
-            )}
-          </div>
+          {externalId && (
+            <div className="flex items-center gap-1.5">
+              <Hash className="h-3.5 w-3.5 shrink-0 text-gray-11" />
+              <TruncatedColumnTextValue
+                value={externalId}
+                className="max-w-[200px] 2xl:max-w-[280px]"
+              />
+            </div>
+          )}
+          {!showEmail && !externalId && <span className="text-gray-11">-</span>}
         </div>
       );
     },
@@ -192,3 +165,10 @@ export const createUsersTableColumns = (): ColumnDefWithAccessorKey[] => [
     },
   },
 ];
+
+const INVITATION_COLUMNS = ['identity', 'role', 'createdAt', 'status'];
+
+export const createInvitationsTableColumns = (): ColumnDefWithAccessorKey[] =>
+  createUsersTableColumns().filter((column) =>
+    INVITATION_COLUMNS.includes(column.accessorKey),
+  );

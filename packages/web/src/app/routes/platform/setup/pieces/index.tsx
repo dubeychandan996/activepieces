@@ -184,7 +184,7 @@ export const PiecesListTab = () => {
     );
 
   return (
-    <AdminPage fill>
+    <AdminPage>
       <AdminPageHeader
         title={t('Pieces')}
         description={t('Manage the pieces that are available to your users')}
@@ -229,8 +229,7 @@ export const PiecesListTab = () => {
           <DownloadPiecesReportButton key="download-report" />,
           <SyncPiecesButton key="sync" />,
         ]}
-        virtualizeRows={true}
-        hidePagination={true}
+        clientPagination={true}
       />
     </AdminPage>
   );

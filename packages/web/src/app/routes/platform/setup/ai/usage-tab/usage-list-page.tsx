@@ -5,10 +5,11 @@ import {
   AiUsageHistory,
   AiUsageItem,
 } from '@activepieces/shared';
+import { ColumnDef } from '@tanstack/react-table';
 import { t } from 'i18next';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 
 import {
   AdminPageHeader,
@@ -16,6 +17,7 @@ import {
   adminSurface,
 } from '@/app/components/admin';
 import { DataFetchErrorState } from '@/components/custom/data-fetch-error-state';
+import { DataTable, RowDataWithActions } from '@/components/custom/data-table';
 import { SearchInput } from '@/components/custom/search-input';
 import { TextWithTooltip } from '@/components/custom/text-with-tooltip';
 import { Button } from '@/components/ui/button';
@@ -25,12 +27,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { aiUsageHooks } from '@/features/ai-usage';
+import { useNewWindow } from '@/lib/navigation-utils';
 import { cn } from '@/lib/utils';
 
 import { AiCenterTrail } from '../components/ai-center-trail';
 
 import { usageAdapters } from './usage-adapters';
-import { DeltaChip, ItemIcon, USAGE_LIST_GRID } from './usage-bits';
+import { DeltaChip, ItemIcon } from './usage-bits';
 import { UsageEmpty } from './usage-empty';
 import { usageFormat } from './usage-format';
 import {
@@ -119,8 +122,8 @@ function UsageListBody({
 }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<UsageSort>(DEFAULT_SORT);
-  const [page, setPage] = useState(1);
-  const listRef = useRef<HTMLElement>(null);
+  const navigate = useNavigate();
+  const openNewWindow = useNewWindow();
   const plural = usageFormat.dimensionLabel({ dimension }).toLowerCase();
 
   if (isError) {
@@ -154,31 +157,82 @@ function UsageListBody({
     }),
     sort,
   });
-  const pageCount = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
-  const current = Math.min(page, pageCount);
-  const shown = matches.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-  const changeSort = (next: UsageSort): void => {
-    setSort(next);
-    setPage(1);
-  };
-  const goTo = (next: number): void => {
-    setPage(next);
-    listRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  };
+  const sortHeader = (label: string, column: UsageSortColumn) => (
+    <SortHeader label={label} column={column} sort={sort} onSort={setSort} />
+  );
+  const columns: ColumnDef<RowDataWithActions<AiUsageItem>>[] = [
+    {
+      id: 'name',
+      header: () =>
+        sortHeader(usageFormat.dimensionBadge({ dimension }), 'name'),
+      cell: ({ row }) => (
+        <UsageItemCell item={row.original} totalUsd={totalUsd} />
+      ),
+    },
+    {
+      id: 'change',
+      size: 100,
+      header: () => sortHeader(t('Change'), 'change'),
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          {row.original.comparable ? (
+            <DeltaChip
+              value={usageFormat.change({
+                current: row.original.spendUsd,
+                previous: row.original.previousSpendUsd,
+              })}
+              size="xs"
+            />
+          ) : (
+            <span className="text-xs text-gray-9">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'calls',
+      size: 100,
+      header: () => sortHeader(t('Calls'), 'calls'),
+      cell: ({ row }) => (
+        <div className="text-right text-sm tabular-nums text-gray-11">
+          {usageFormat.whole(row.original.calls)}
+        </div>
+      ),
+    },
+    {
+      id: 'tokens',
+      size: 100,
+      header: () => sortHeader(t('Tokens'), 'tokens'),
+      cell: ({ row }) => (
+        <div className="text-right text-sm tabular-nums text-gray-11">
+          {usageFormat.compact(row.original.tokens)}
+        </div>
+      ),
+    },
+    {
+      id: 'spend',
+      size: 110,
+      header: () => sortHeader(t('Spend'), 'spend'),
+      cell: ({ row }) => (
+        <div className="text-right text-sm font-medium tabular-nums text-gray-12">
+          {usageFormat.usd(row.original.spendUsd)}
+        </div>
+      ),
+    },
+    {
+      id: 'open',
+      size: 40,
+      cell: () => <ChevronRight className="size-4 text-gray-9" />,
+    },
+  ];
 
   return (
-    <section
-      ref={listRef}
-      className={cn(adminSurface.card, 'flex scroll-mt-4 flex-col')}
-    >
+    <section className={cn(adminSurface.card, 'flex flex-col')}>
       <div className="flex flex-wrap items-center justify-between gap-3 p-3">
         <div className="w-full sm:max-w-xs">
           <SearchInput
             value={query}
-            onChange={(value) => {
-              setQuery(value);
-              setPage(1);
-            }}
+            onChange={setQuery}
             placeholder={t('Search {items}', { items: plural })}
           />
         </div>
@@ -202,191 +256,84 @@ function UsageListBody({
           )}
         </p>
       )}
-      <div
-        className={cn(
-          USAGE_LIST_GRID,
-          'border-y border-gray-6 px-5 py-2 text-xs text-gray-11',
-        )}
-      >
-        <SortHeader
-          label={usageFormat.dimensionBadge({ dimension })}
-          column="name"
-          sort={sort}
-          onSort={changeSort}
-        />
-        <SortHeader
-          label={t('Change')}
-          column="change"
-          sort={sort}
-          onSort={changeSort}
-          className="hidden md:flex"
-        />
-        <SortHeader
-          label={t('Calls')}
-          column="calls"
-          sort={sort}
-          onSort={changeSort}
-          className="hidden md:flex"
-        />
-        <SortHeader
-          label={t('Tokens')}
-          column="tokens"
-          sort={sort}
-          onSort={changeSort}
-          className="hidden md:flex"
-        />
-        <SortHeader
-          label={t('Spend')}
-          column="spend"
-          sort={sort}
-          onSort={changeSort}
-        />
-        <span />
-      </div>
-      {matches.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
-          <p className="text-sm text-gray-11">
-            {t('No {items} match "{query}"', { items: plural, query })}
-          </p>
+      <DataTable
+        columns={columns}
+        page={{ data: matches, next: null, previous: null }}
+        isLoading={false}
+        isError={false}
+        errorStateEntity={plural}
+        emptyStateTextTitle={t('No {items} match "{query}"', {
+          items: plural,
+          query,
+        })}
+        emptyStateTextDescription=""
+        emptyStateIcon={null}
+        emptyStateAction={
           <Button variant="outline" size="sm" onClick={() => setQuery('')}>
             {t('Clear search')}
           </Button>
-        </div>
-      ) : (
-        <ul className="flex flex-col divide-y divide-gray-6">
-          {shown.map((item) => (
-            <UsageListRow
-              key={item.id}
-              item={item}
-              totalUsd={totalUsd}
-              search={view.search}
-            />
-          ))}
-        </ul>
-      )}
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between gap-3 border-t border-gray-6 px-5 py-3">
-          <span className="text-xs tabular-nums text-gray-11">
-            {t('{from}–{to} of {total}', {
-              from: usageFormat.whole((current - 1) * PAGE_SIZE + 1),
-              to: usageFormat.whole((current - 1) * PAGE_SIZE + shown.length),
-              total: usageFormat.whole(matches.length),
-            })}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={current === 1}
-              onClick={() => goTo(current - 1)}
-              aria-label={t('Previous page')}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="min-w-20 text-center text-xs tabular-nums text-gray-11">
-              {t('Page {page} of {pages}', {
-                page: usageFormat.whole(current),
-                pages: usageFormat.whole(pageCount),
-              })}
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={current === pageCount}
-              onClick={() => goTo(current + 1)}
-              aria-label={t('Next page')}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+        }
+        getRowId={(item) => item.id}
+        onRowClick={(item, newWindow) => {
+          const to = `/platform/ai/usage/${item.dimension}/${item.id}${view.search}`;
+          if (newWindow) {
+            openNewWindow(to);
+          } else {
+            navigate(to);
+          }
+        }}
+        clientPagination={true}
+        paginationKey="usageItems"
+      />
     </section>
   );
 }
 
-function UsageListRow({
+function UsageItemCell({
   item,
   totalUsd,
-  search,
 }: {
   item: AiUsageItem;
   totalUsd: number;
-  search: string;
 }) {
   const share = totalUsd === 0 ? 0 : item.spendUsd / totalUsd;
   const name = usageAdapters.itemDisplayName({ item });
   return (
-    <li>
-      <Link
-        to={`/platform/ai/usage/${item.dimension}/${item.id}${search}`}
-        className={cn(
-          USAGE_LIST_GRID,
-          'group px-5 py-3.5 transition-colors hover:bg-gray-2 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-gray-8/50',
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-6 bg-gray-1">
-            <ItemIcon item={item} />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <TextWithTooltip tooltipMessage={name}>
-                <p className="truncate text-sm font-medium text-gray-12">
-                  {name}
-                </p>
-              </TextWithTooltip>
-              {usageAdapters.hasSharedSpend({ item }) && (
-                <SharedBadge item={item} />
-              )}
-            </div>
-            <div className="flex min-w-0 items-center gap-2">
-              <p className="truncate text-xs text-gray-11">
-                {usageAdapters.itemSubtitle({ item })}
-              </p>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-gray-3">
-                    <span
-                      className="block h-full rounded-full bg-accent-9"
-                      style={{ width: `${Math.max(share * 100, 2)}%` }}
-                    />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6}>
-                  {t('{share} of all AI spend in this period', {
-                    share: usageFormat.percent(share),
-                  })}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </div>
-        <span className="hidden justify-end md:flex">
-          {item.comparable ? (
-            <DeltaChip
-              value={usageFormat.change({
-                current: item.spendUsd,
-                previous: item.previousSpendUsd,
-              })}
-              size="xs"
-            />
-          ) : (
-            <span className="text-xs text-gray-9">—</span>
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-6 bg-gray-1">
+        <ItemIcon item={item} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <TextWithTooltip tooltipMessage={name}>
+            <p className="truncate text-sm font-medium text-gray-12">{name}</p>
+          </TextWithTooltip>
+          {usageAdapters.hasSharedSpend({ item }) && (
+            <SharedBadge item={item} />
           )}
-        </span>
-        <span className="hidden text-right text-sm tabular-nums text-gray-11 md:block">
-          {usageFormat.whole(item.calls)}
-        </span>
-        <span className="hidden text-right text-sm tabular-nums text-gray-11 md:block">
-          {usageFormat.compact(item.tokens)}
-        </span>
-        <span className="text-right text-sm font-medium tabular-nums text-gray-12">
-          {usageFormat.usd(item.spendUsd)}
-        </span>
-        <ChevronRight className="size-4 text-gray-9 transition-colors group-hover:text-gray-11" />
-      </Link>
-    </li>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-xs text-gray-11">
+            {usageAdapters.itemSubtitle({ item })}
+          </p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-gray-3">
+                <span
+                  className="block h-full rounded-full bg-accent-9"
+                  style={{ width: `${Math.max(share * 100, 2)}%` }}
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              {t('{share} of all AI spend in this period', {
+                share: usageFormat.percent(share),
+              })}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -478,7 +425,6 @@ function sortValue({
   }
 }
 
-const PAGE_SIZE = 25;
 const DEFAULT_SORT: UsageSort = { column: 'spend', desc: true };
 
 type UsageSortColumn = 'name' | 'spend' | 'change' | 'calls' | 'tokens';
